@@ -1,0 +1,728 @@
+kubeadm init --pod-network-cidr=10.244.0.0/16 --upload-certs --kubernetes-version=v1.24.0 --control-plane-endpoint=18.237.169.132 --ignore-preflight-errors=Mem --cri-socket /run/containerd/containerd.sock 
+
+https://github.com/kharatramesh/misalpav/blob/main/terraform/installk8sonubuntu/k8s.txt
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now join any number of the control-plane node running the following command on each as root:
+
+  kubeadm join 3.88.174.169:6443 --token jy9l0s.3l9mm1tu7jcmjuhk \
+        --discovery-token-ca-cert-hash sha256:7ac4398084c7ae8190ebaf43dd706faca38ff047193691f1f9d96194da7e9711 \
+        --control-plane --certificate-key 4e9483629486e6a8eec8022f81e33b15ae8ab00d67c92d38b0a3d7341bfe8f92
+
+Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
+"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 3.88.174.169:6443 --token jy9l0s.3l9mm1tu7jcmjuhk \
+        --discovery-token-ca-cert-hash sha256:7ac4398084c7ae8190ebaf43dd706faca38ff047193691f1f9d96194da7e9711
+
+kubectl taint node master  node-role.kubernetes.io/master:NoSchedule-
+
+====================
+Task Scenarios:
+
+1. Create hello-openshift pod using yaml file. Using Pod name hello-openshift, label name as course= kucl, use Pod Yaml file name as /kucl_tasks/ task1.yaml
+
+2. Run nginx deployment using create command and expose the svc using yaml file. Use Deployment name nginx and SVC name unnati. Use Svc yaml file name as /kucl_tasks/task2.yaml.'
+
+3. Run Postgres deployment using yaml file Deployment Yaml file name as /kucl_tasks/task3.yaml Deployment name as postgres
+
+4.Run httpd deployment using yaml file expose deployment. And make SVC NodePort. Deployment Yaml file name as /kucl_tasks/task4.yaml Deployment name=httpd
+
+Thank you Ashutosh S. Bhakare Sir for giving such interesting task to complete.
+
+================
+docker PS equivalent :
+--------------------------
+root@worker1:~# ctr -n k8s.io containers list | grep -i 664738c3fffab5621787ef3c7f4e7ef67649e47284fe026bc9995733b57bc6c6
+664738c3fffab5621787ef3c7f4e7ef67649e47284fe026bc9995733b57bc6c6    docker.io/library/httpd:latest            io.containerd.runc.v2
+
+docker inspect equivalent :
+---------------------------------
+ ctr -n k8s.io containers info 664738c3fffab5621787ef3c7f4e7ef67649e47284fe026bc9995733b57bc6c6
+ctr -n k8s.io containers info < ID container>
+
+ docker images : Imaged id grep 
+---------------------
+root@worker1:~# ctr -n k8s.io images list | grep -i docker.io/library/httpd@sha256:1bb3f7669a85713906e695599d29c58ab40d4e6409907946609d92a428e95b49
+docker.io/library/httpd@sha256:1bb3f7669a85713906e695599d29c58ab40d4e6409907946609d92a428e95b49         application/vnd.docker.distribution.manifest.list.v2+json sha256:1bb3f7669a85713906e695599d29c58ab40d4e6409907946609d92a428e95b49 54.5 MiB  linux/386,linux/amd64,linux/arm/v5,linux/arm/v7,linux/arm64/v8,linux/mips64le,linux/ppc64le,linux/s390x io.cri-containerd.image=managed
+
+======
+
+https://k21academy.com/topic/activity-guide-lab-deploy-scalable-stateless-application-configuring-autoscaling-for-stateless-application/
+https://jamesdefabia.github.io/docs/admin/limitrange/
+https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/use-resource-controller-to-dynamically-modify-the-upper-limit-of-resources-for-a-pod
+
+- --kubelet-insecure-tls
+https://us-west-2.console.aws.amazon.com
+
+
+============
+ kharatramesh/vadapavimages:pavbhaji
+kubectl edit deployment/app1 -n google 
+
+root@ip-172-31-1-248:~# kubectl rollout history deploy/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+root@ip-172-31-1-248:~# kubectl get rs -n google
+NAME              DESIRED   CURRENT   READY   AGE
+app1-6f9b8f7f46   0         0         0       24m
+app1-7ff86df5d6   5         5         5       17m
+root@ip-172-31-1-248:~#
+
+root@ip-172-31-1-248:~# kubectl rollout history deployment/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:biryani --record=true --namespace=google
+
+root@ip-172-31-1-248:~# kubectl get rs -n google
+NAME              DESIRED   CURRENT   READY   AGE
+app1-64ff54687c   5         5         5       9m57s
+app1-6f9b8f7f46   0         0         0       42m
+app1-7ff86df5d6   0         0         0       35m
+
+root@ip-172-31-1-248:~# kubectl rollout history deployment/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:biryani --record=true --namespace=google
+4         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+
+root@ip-172-31-1-248:~# kubectl get rs -n google
+NAME              DESIRED   CURRENT   READY   AGE
+app1-5b84498554   5         5         5       75s
+app1-64ff54687c   0         0         0       13m
+app1-6f9b8f7f46   0         0         0       46m
+app1-7ff86df5d6   0         0         0       39m
+
+root@ip-172-31-1-248:~# kubectl rollout history deployment/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+5         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+6         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+
+===
+root@ip-172-31-1-248:~# kubectl rollout history deployment/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+6         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+7         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+
+Note : we have 2 observations :  
+
+A.  The latest revision is showing on bottom revison number from rollout history command .which is running on container and refleting on browser.
+     when we roll back (undo) to previous version of app 2 things happen :
+      (i) First the old revison app deployed like in given example we are going back to revision 6 of the app.
+      (ii) Second thing happend in background the history command updated the new revison number 7 which is next to exisitng revison number 6 .And we will see the rollout history cmd output the new undo
+           revison id 7 no more old revision 6 will be there after rolling back.
+B. We observe that if we update the yaml deployment  file container image using kubectl edit command than the rollout history command is not showing the updated image .What we could see the latest
+ revison number updated one showing the same image name .e.g. you could see the revision number 6 and 7 both having differnet images but it is showing same image name : kharatramesh/vadapavimages:pavbhaji  . Hence we need to update the image in yaml of deplyment than we must use record command which will refelct the correct image name in rollout history command.
+Becuase we have to roll back (undo) based on the image name of app .
+
+
+root@ip-172-31-1-248:~# kubectl rollout undo deployment/app1 --to-revision=6 -n  google
+deployment.apps/app1 rolled back
+
+
+
+root@ip-172-31-1-248:~# kubectl rollout history deployment/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+7         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+8         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+
+root@ip-172-31-1-248:~# kubectl rollout undo deployment/app1 --to-revision=7 -n   google
+deployment.apps/app1 rolled back
+
+root@ip-172-31-1-248:~# kubectl rollout history deployment/app1 -n google
+deployment.apps/app1
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+8         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+9         kubectl deployment/app1 set image deployment/app1 nginx=kharatramesh/vadapavimages:pavbhaji --record=true --namespace=google
+
+============ Resource quota========================================================================
+root@master:~/Kubernetes# kubectl get resourcequota -n google
+NAME    AGE     REQUEST                                                                   LIMIT
+quota   4m23s   pods: 5/3, requests.cpu: 0/100m, requests.memory: 0/200M, services: 0/5   limits.cpu: 0/200m, limits.memory: 0/400M
+======================== NFS storage in K8================================================================
+
+1 step.NFS master create and test
+2.step role binding
+root@master:~/Kubernetes# kubectl create -f nfs_rbac.yaml
+
+root@master:~/Kubernetes# kubectl get sa
+NAME                     SECRETS   AGE
+default                  0         27h
+nfs-client-provisioner   0         30s
+
+root@master:~/Kubernetes# kubectl get role
+NAME                                    CREATED AT
+leader-locking-nfs-client-provisioner   2023-06-22T10:21:45Z
+
+root@master:~/Kubernetes# kubectl get rolebinding
+NAME                                    ROLE                                         AGE
+leader-locking-nfs-client-provisioner   Role/leader-locking-nfs-client-provisioner   2m42s
+
+3Step . Run NFS as cluster service .
+  kubectl apply -f nfs_deployment.yaml
+
+root@master:~/Kubernetes# kubectl get pods
+NAME                                     READY   STATUS    RESTARTS   AGE
+nfs-client-provisioner-77f69574d-ppjff   1/1     Running   0          8m16s
+
+4 step . Run storage class.
+
+root@master:~/Kubernetes# kubectl create -f nfs_class.yaml
+storageclass.storage.k8s.io/managed-nfs-storage created
+root@master:~/Kubernetes# kubectl get sc
+NAME                  PROVISIONER                                   RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+managed-nfs-storage   k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false    
+
+5 step . Create PV which will automatically create PV as well. We did not apply any yaml file for PV it has been created automatically with PVC creation.
+
+root@master:~/Kubernetes# kubectl create -f pvc-nfs.yaml
+persistentvolumeclaim/pvc1 created
+
+root@master:~/Kubernetes# kubectl get pvc
+
+NAME   STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
+pvc1   Bound    pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            managed-nfs-storage   9s
+
+root@master:~/Kubernetes# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS          REASON   AGE
+pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            Delete           Bound    default/pvc1   managed-nfs-storage            21s
+root@master:~/Kubernetes#
+
+6step :now create POD where nfs will get mounted .
+
+root@master:~/Kubernetes# kubectl create -f nfs-nginx-web-server.yaml
+pod/web-server created
+root@master:~/Kubernetes# kubectl get pods
+NAME                                     READY   STATUS    RESTARTS   AGE
+nfs-client-provisioner-77f69574d-ppjff   1/1     Running   0          18m
+oracle-app-5cf4f8867c-h6tcx              1/1     Running   0          27h
+web-server                               1/1     Running   0          6s
+root@master:~/Kubernetes#
+root@master:~/Kubernetes#
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                     READY   STATUS    RESTARTS   AGE     IP                                                                                                  NODE      NOMINATED NODE   READINESS GATES
+nfs-client-provisioner-77f69574d-ppjff   1/1     Running   0          23m     10                                                                                        .32.0.4   worker1   <none>           <none>
+oracle-app-5cf4f8867c-h6tcx              1/1     Running   0          27h     10                                                                                        .32.0.3   worker1   <none>           <none>
+web-server                               1/1     Running   0          4m19s   10                                                                                        .32.0.5   worker1   <none>           <none>
+root@master:~/Kubernetes# kubectl get pods -o wide
+NAME                                     READY   STATUS    RESTARTS   AGE     IP          NODE      NOMINATED NODE   READINESS GATES
+nfs-client-provisioner-77f69574d-ppjff   1/1     Running   0          23m     10.32.0.4   worker1   <none>           <none>
+oracle-app-5cf4f8867c-h6tcx              1/1     Running   0          27h     10.32.0.3   worker1   <none>           <none>
+web-server                               1/1     Running   0          4m33s   10.32.0.5   worker1   <none>           <none>
+root@master:~/Kubernetes# kubectl describe web-server
+error: the server doesn't have a resource type "web-server"
+root@master:~/Kubernetes# kubectl describe pod web-server
+Name:         web-server
+Namespace:    default
+Priority:     0
+Node:         worker1/172.31.18.93
+Start Time:   Thu, 22 Jun 2023 12:48:18 +0000
+Labels:       <none>
+Annotations:  <none>
+Status:       Running
+IP:           10.32.0.5
+IPs:
+  IP:  10.32.0.5
+Containers:
+  web-container:
+    Container ID:   containerd://64c0aaae083170b295e536782d05983a1ba2d96d7d8d69cf2110709ca023fccd
+    Image:          nginx
+    Image ID:       docker.io/library/nginx@sha256:593dac25b7733ffb7afe1a72649a43e574778bf025ad60514ef40f6b5d606247
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Thu, 22 Jun 2023 12:48:19 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /usr/share/nginx/html from nfs-volume (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-86q84 (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+Volumes:
+  nfs-volume:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  pvc1
+    ReadOnly:   false
+  kube-api-access-86q84:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  6m58s  default-scheduler  Successfully assigned default/web-server to worker1
+  Normal  Pulling    6m57s  kubelet            Pulling image "nginx"
+  Normal  Pulled     6m57s  kubelet            Successfully pulled image "nginx" in 539.871603ms
+  Normal  Created    6m57s  kubelet            Created container web-container
+  Normal  Started    6m57s  kubelet            Started container web-container
+
+7 Step .Verfication . now login to POD and check the NFS mounted .
+
+root@master:~/Kubernetes# kubectl exec -it web-server bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+
+root@web-server:/# df -h
+Filesystem                                                                            Size  Used Avail Use% Mounted on
+overlay                                                                               7.6G  5.4G  2.2G  72% /
+tmpfs                                                                                  64M     0   64M   0% /dev
+tmpfs                                                                                 484M     0  484M   0% /sys/fs/cgroup
+/dev/root                                                                             7.6G  5.4G  2.2G  72% /etc/hosts
+shm                                                                                    64M     0   64M   0% /dev/shm
+172.31.15.19:/srv/nfs/kubedata/default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a  7.6G  4.1G  3.5G  55% /usr/share/nginx/html    ---->> NFS server kubernets master server private ip 172.31.15.19 this is NFS share  default is storage class and PVC1 is pvc claim name (default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a) mounted on POD container mount point /usr/share/nginx/html
+tmpfs                                                                                 867M   12K  867M   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs                                                                                 484M     0  484M   0% /proc/acpi
+tmpfs                                                                                 484M     0  484M   0% /proc/scsi
+tmpfs                                                                                 484M     0  484M   0% /sys/firmware
+root@web-server:/#
+
+
+172.31.15.19:/srv/nfs/kubedata/default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a  7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/c2a7a044-158b-42df-bd27-17f3e3183e77/volumes/kubernetes.io~nfs/pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a
+
+172.31.15.19:/srv/nfs/kubedata          7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root
+
+root@worker1:/var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root# ls
+1.txt  default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a
+
+root@worker1:/var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root/default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a# ls
+index.html
+
+--------------
+root@worker1:~# cd /var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root
+root@worker1:/var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root# ls
+1.txt  default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a  default-pvc2-pvc-89ce4356-e1ad-4c98-b560-a7040b70d627
+root@worker1:/var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root# cd /var/lib/kubelet/pods/ec9df7f6-e9c4-457b-a8a5-8288adbb01b1/volumes/kubernetes.io~nfs/nfs-client-root
+root@worker1:/var/lib/kubelet/pods/ec9df7f6-e9c4-457b-a8a5-8288adbb01b1/volumes/kubernetes.io~nfs/nfs-client-root# ls
+1.txt  index.html  text.txt
+root@worker1:/var/lib/kubelet/pods/ec9df7f6-e9c4-457b-a8a5-8288adbb01b1/volumes/kubernetes.io~nfs/nfs-client-root#
+
+---------------
+root@worker1:~# df -h | grep nfs
+172.31.15.19:/srv/nfs/kubedata/default-pvc1-pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a  7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/c2a7a044-158b-42df-bd27-17f3e3183e77/volumes/kubernetes.io~nfs/pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a
+172.31.15.19:/srv/nfs/kubedata                                                        7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/17b4db4d-76c1-4491-aa47-2fc03ae23df4/volumes/kubernetes.io~nfs/nfs-client-root
+
+172.31.15.19:/vadapav/samosa                                                          7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/ec9df7f6-e9c4-457b-a8a5-8288adbb01b1/volumes/kubernetes.io~nfs/nfs-client-root
+
+172.31.15.19:/srv/nfs/kubedata/default-pvc2-pvc-89ce4356-e1ad-4c98-b560-a7040b70d627  7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/d2f0d9a1-4fe7-4d13-bc9b-a7ab05321ff1/volumes/kubernetes.io~nfs/pvc-89ce4356-e1ad-4c98-b560-a7040b70d627
+172.31.15.19:/srv/nfs/kubedata/default-pvc2-pvc-89ce4356-e1ad-4c98-b560-a7040b70d627  7.6G  4.2G  3.5G  55% /var/lib/kubelet/pods/a0335c24-62fc-4465-9e75-1e9fa8feae25/volumes/kubernetes.io~nfs/pvc-89ce4356-e1ad-4c98-b560-a7040b70d627
+
+-----------------------PVC deletion---------------------------------------
+
+root@master:/vadapav/samosa# kubectl get pvc
+NAME   STATUS        VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
+pvc1   Bound         pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            managed-nfs-storage   9h
+pvc2   Terminating   pvc-89ce4356-e1ad-4c98-b560-a7040b70d627   1Gi        RWX            managed-nfs-storage   58m
+root@master:/vadapav/samosa# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS          REASON   AGE
+pvc-89ce4356-e1ad-4c98-b560-a7040b70d627   1Gi        RWX            Delete           Bound    default/pvc2   managed-nfs-storage            58m
+pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            Delete           Bound    default/pvc1   managed-nfs-storage            9h
+root@master:/vadapav/samosa# kubectl patch pvc pvc2 -p '{"metadata":{"finalizers":null}}'
+persistentvolumeclaim/pvc2 patched
+
+root@master:/vadapav/samosa# kubectl get pvc
+NAME   STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
+pvc1   Bound    pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            managed-nfs-storage   9h
+
+root@master:/vadapav/samosa# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS          REASON   AGE
+pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            Delete           Bound    default/pvc1   managed-nfs-storage            9h
+
+We change the reclaim policy of PV  from delete to retain .
+---------------------------------------------------------------------------
+root@master:/vadapav/samosa# kubectl patch pv pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a  -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+persistentvolume/pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a patched
+root@master:/vadapav/samosa# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS          REASON   AGE
+pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            Retain           Bound    default/pvc1   managed-nfs-storage            9h
+
+Now after deleting the PVC , PV did not get deleted automatically insated it status changed to Released.
+-------------------------------------------------------------------------------------------------------------------------------------
+root@master:~# kubectl patch pvc pvc1 -p '{"metadata":{"finalizers":null}}'
+persistentvolumeclaim/pvc1 patched
+root@master:~# kubectl get pvc
+No resources found in default namespace.
+root@master:~# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS     CLAIM          STORAGECLASS          REASON   AGE
+pvc-d85c8b14-6af4-4fc0-8f79-02653f81f55a   2Gi        RWX            Retain              Released   default/pvc1   managed-nfs-storage            9h
+root@master:~#
+
+
+
+Events:
+  Type    Reason                Age               From                         Message
+  ----    ------                ----              ----                         -------
+  Normal  ExternalProvisioning  1s (x4 over 45s)  
+
+aws ec2 create-volume --availability-zone=us-west-2c --size=10 --volume-type=gp2
+
+
+
+
+
+===========================Advanced scheduling =============================
+https://k21academy.com/topic/activity-guide-lab-constraint-pod-node-selector-node-affinity-anti-affinity-taint-toleration/
+
+===================================================K8 security===========================================
+
+https://k21academy.com/topic/activity-guide-lab-cluster-security-working-with-configmap-limiting-resources-with-resource-quota/
+
+CKAD: https://k21academy.com/topic/activity-guide-lab-network-policies-and-user-secruity-context/
+
+==> https://redlineperf.com/wp-content/uploads/2022/10/oreilly-ebook-kubernetes-best-practices.pdf
+
+
+https://kubernetes.io/docs/concepts/services-networking/network-policies/
+
+root@master:~/Kubernetes# cat  networkpolicy_ping.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np1
+  namespace: ibm
+spec:
+  policyTypes:
+  - Ingress
+  podSelector:
+    matchLabels:
+      ibm: pod2
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          google: pod2
+      namespaceSelector:
+        matchLabels:
+          ns1: google
+
+=========================================K8 security context  & config map & ingress controller========================================
+
+CKA: https://k21academy.com/topic/activity-guide-lab-cluster-security-working-with-configmap-limiting-resources-with-resource-quota/
+
+
+CKAD:  https://k21academy.com/topic/activity-guide-lab-network-policies-and-user-secruity-context/
+
+https://www.base64encode.org/
+
+Activity Guide: Ingress Controller
+
+CKA: https://k21academy.com/topic/activity-guide-lab-kubernetes-ingress-controller/
+
+CKAD: https://k21academy.com/topic/activity-guide-lab-kubernetes-ingress-controller-2/
+------------------------------------------------------------------
+
+root@master:~# kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://34.222.31.6:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: kubernetes-admin
+  name: kubernetes-admin@kubernetes
+current-context: kubernetes-admin@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+root@master:~#
+root@master:~# kubectl config get-contexts
+CURRENT   NAME                                    CLUSTER      AUTHINFO           NAMESPACE
+*         kubernetes-admin@kubernetes   kubernetes     kubernetes-admin
+root@master:~#
+
+
+openssl req -new -key DevDan.key  -out DevDan.csr -subj "/CN=DevDan/O=development"
+
+openssl x509 -req -in sandy.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key  -CAcreateserial  -out sandy.crt -days 45
+
+kubectl config set-credentials sandy  --client-certificate=sandy.crt --client-key=sandy.key
+
+kubectl config set-context sandy-context  --cluster=kubernetes --namespace=development  --user=sandy
+
+
+openssl genrsa -out DevDan.key 2048
+
+openssl req -new -key DevDan.key  -out DevDan.csr -subj "/CN=DevDan/O=development" 
+
+openssl x509 -req -in DevDan.csr  -CA /etc/kubernetes/pki/ca.crt  -CAkey /etc/kubernetes/pki/ca.key  -CAcreateserial  -out DevDan.crt -days 45
+kubectl config set-credentials DevDan  --client-certificate=DevDan.crt --client-key=DevDan.key
+
+kubectl config set-context DevDan-context  --cluster=kubernetes  --namespace=development  --user=DevDan
+
+----
+1.openssl genrsa -out  andy.key 2048   --create private key 
+2 openssl req -new -key andy.key  -out andy.csr -subj "/CN=Andy/O=development"   -- create a CSR request
+
+3.openssl x509 -req -in andy.csr  -CA /etc/kubernetes/pki/ca.crt  -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out andy.crt -days 45  -- self sined certifcate
+4. kubectl config set-credentials andy  --client-certificate=andy.crt --client-key=andy.key    --set the config file 
+5. kubectl config set-context  andy-context  --cluster=kubernetes  --namespace=development --user=andy      --create context  
+
+
+kubectl auth can-i create deployments --namespace dev 
+
+ontrolplane $ kubeadm certs check-expiration
+[check-expiration] Reading configuration from the cluster...
+[check-expiration] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+
+CERTIFICATE                EXPIRES                  RESIDUAL TIME   CERTIFICATE AUTHORITY   EXTERNALLY MANAGED
+admin.conf                 Jul 01, 2024 16:39 UTC   364d            ca                      no      
+apiserver                  Jul 01, 2024 16:39 UTC   364d            ca                      no      
+apiserver-etcd-client      Jul 01, 2024 16:39 UTC   364d            etcd-ca                 no      
+apiserver-kubelet-client   Jul 01, 2024 16:39 UTC   364d            ca                      no      
+controller-manager.conf    Jul 01, 2024 16:39 UTC   364d            ca                      no      
+etcd-healthcheck-client    Jul 01, 2024 16:39 UTC   364d            etcd-ca                 no      
+etcd-peer                  Jul 01, 2024 16:39 UTC   364d            etcd-ca                 no      
+etcd-server                Jul 01, 2024 16:39 UTC   364d            etcd-ca                 no      
+front-proxy-client         Jul 01, 2024 16:39 UTC   364d            front-proxy-ca          no      
+scheduler.conf             Jul 01, 2024 16:39 UTC   364d            ca                      no      
+
+CERTIFICATE AUTHORITY   EXPIRES                  RESIDUAL TIME   EXTERNALLY MANAGED
+ca                      May 17, 2033 19:10 UTC   9y              no      
+etcd-ca                 May 17, 2033 19:10 UTC   9y              no      
+front-proxy-ca          May 17, 2033 19:10 UTC   9y              no      
+controlplane $ 
+
+=======================================STS, daemon set , maintanenace cluster==============================
+
+https://k21academy.com/docker-kubernetes/statefulset/
+
+Node Maintainance: https://k21academy.com/topic/activity-guide-lab-cluster-node-maintenance-debugging-application-failure-troubleshooting-cluster/
+
+Upgrading Cluster: https://k21academy.com/topic/activity-guide-lab-upgrade-kubernetes-cluster-master-worker-nodes/
+
+ETCD Backup & Restore: https://k21academy.com/topic/activity-guide-lab-backup-restore-etcd-cluster/
+
+================================CKAD-------------------------------------------------
+liveness probe will restart the pod and heal it but if the liveness probe is unable to heal the issue.. Readiness will remove the pod from list of ep so your users wont have error accessing the app
+
+Hi Anand: Health Check Probes: https://k21academy.com/topic/activity-guide-lab-readiness-health-and-liveness-health-2/
+
+Multi Container Pattern: https://k21academy.com/topic/activity-guide-lab-multi-container-pattern-side-car-shared-ipc-ambassador/
+
+K8s Jobs: https://k21academy.com/topic/activity-guide-lab-kubernetes-jobs-cronjob-jobs-coarse-parallel-job/
+
+https://k21academy.com/topic/presentation-kubernetes-overview-concepts-2/
+======================CRD=======================
+
+https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+
+https://12factor.net/
+
+==========================Exam=================
+
+CKA Exam QS Link: https://k21academy.com/lessons/kubernetes-module-9-cka-sample-practice-q-a/
+
+
+
+CKAD Exam QS Link: https://k21academy.com/lessons/kubernetes-module-12-certified-kubernetes-application-developer-ckad-practice-questions-and-answers/
+
+
+kubectl run static-busybox-1 --image=busybox --command  sleep 1000 --dry-run=client -o yaml > /etc/kubernetes/manifests/pod2.yaml
+
+
+
+
+Reply with a private chat messageRamesh SS KHARAT to Everyone
+
+cat /etc/kubernetes/manifest/etcd.yaml
+# apt install etcd-client     ----- to install etcdctl cmd utility.
+
+# ETCDCTL_API=3 etcdctl --endpoints 10.1.0.4:2379 --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key --cacert=/etc/kubernetes/pki/etcd/ca.crt snapshot save snapshot.db
+
+# rm -fr /var/lib/etcd
+
+For restoration
+# ETCDCTL_API=3 etcdctl snapshot restore snapshot.db --endpoints 10.1.0.4:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key --name=master --data-dir=/var/lib/etcd --initial-cluster=master=https://10.1.0.4:2380 --initial-cluster-token=etcd-cluster-1 --initial-advertise-peer-urls=https://10.1.0.4:2380
+
+==================
+Replicaset yaml 
+ wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/RS.yml
+ wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/second-pod.yml
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: web-server
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      tier: web-server
+  template:
+    metadata:
+      labels:
+        tier: web-server
+    spec:
+      containers:
+      - name: web-server
+        image: nginx:1.19
+
+===================================
+controlplane $ cat newRS.yml 
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: winnew-andy
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      run : new-archive 
+  template:
+    metadata:
+      labels:
+       run: new-archive
+    spec:
+      containers:
+      - name: web-server
+        image: nginx:1.20
+
+========================================================
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   4         4         4       32m
+winnew-andy       2         2         1       8m10s
+controlplane $ kubectl scale rs web-server-andy --replicas 3
+replicaset.apps/web-server-andy scaled
+controlplane $ kubectl rs
+error: unknown command "rs" for "kubectl"
+
+Did you mean this?
+        run
+        cp
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   3         3         3       32m
+winnew-andy       2         2         2       8m49s
+controlplane $ kubectl scale winnew-andy --replicas 3
+error: the server doesn't have a resource type "winnew-andy"
+controlplane $ kubectl scale rs  winnew-andy --replicas 3
+replicaset.apps/winnew-andy scaled
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   3         3         3       33m
+winnew-andy       3         3         3       9m34s
+controlplane $ kubectl scale rs web-server-andy --replicas 2
+replicaset.apps/web-server-andy scaled
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   2         2         2       33m
+winnew-andy       3         3         3       9m58s
+controlplane $ kubectl scale rs winnew-andy --replicas 4
+replicaset.apps/winnew-andy scaled
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   2         2         2       34m
+winnew-andy       4         4         3       10m
+controlplane $ kubectl scale rs web-server-andy --replicas 1
+replicaset.apps/web-server-andy scaled
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   1         1         1       34m
+winnew-andy       4         4         4       10m
+controlplane $ kubectl scale rs winnew-andy -- replicas 5
+error: required flag(s) "replicas" not set
+controlplane $ kubectl scale rs winnew-andy -- replicas  5
+error: required flag(s) "replicas" not set
+controlplane $ kubectl scale rs winnew-andy --replicas  5
+replicaset.apps/winnew-andy scaled
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   1         1         1       35m
+winnew-andy       5         5         5       11m
+controlplane $ kubectl scale rs web-server-andy --replicas 0
+replicaset.apps/web-server-andy scaled
+controlplane $ kubectl get rs
+NAME              DESIRED   CURRENT   READY   AGE
+web-server-andy   0         0         0       36m
+winnew-andy       5         5         5       12m
+controlplane $ 
+
+
+
+
+controlplane $ cat second-pod.yml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: second-pod
+  labels:
+    app: hello-world-app
+spec:
+  containers:
+  - name: second
+    image: "gcr.io/google-samples/hello-app:2.0"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
