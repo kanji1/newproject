@@ -1,0 +1,672 @@
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/apiVersion%3A%20apps/web-app1.yml
+
+controlplane $ cat web-app1.yml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      tier: web-server
+  template:
+    metadata:
+      labels:
+        tier: web-server
+    spec:
+      containers:
+        - name: web-server-container
+          image: eyesoncloud/web-app:v1
+
+======================HPA==============================
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/metrics-server.yml
+
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/web-app-dep.yml
+
+controlplane $ cat web-app-dep.yml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-application
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - image: nginx
+        name: web-application-container
+        resources:
+          limits:
+            cpu: "100m"
+          requests:
+            cpu: "100m"
+
+now download HPA yaml:
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/web-hpa.yml
+controlplane $ ls
+filesystem  metrics-server.yml  web-app-dep.yml  web-app-dep.yml.1  web-app1.yml  web-hpa.yml
+
+controlplane $ cat web-hpa.yml 
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: demo-hpa
+spec:
+  maxReplicas: 5
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-application
+  targetCPUUtilizationPercentage: 20
+
+========================Nodeselector=========================================
+controlplane $ cd /etc/kubernetes/manifests/
+controlplane $ ls
+etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml
+controlplane $ kubectl get pods -n kube-system
+NAME                                       READY   STATUS    RESTARTS        AGE
+calico-kube-controllers-784cc4bcb7-ghwld   1/1     Running   4 (8m31s ago)   27d
+canal-6tqbh                                2/2     Running   0               7m26s
+canal-r5jht                                2/2     Running   0               7m26s
+coredns-5d769bfcf4-rnp6g                   1/1     Running   0               27d
+coredns-5d769bfcf4-wzbg6                   1/1     Running   0               27d
+etcd-controlplane                          1/1     Running   0               27d
+kube-apiserver-controlplane                1/1     Running   2               27d
+kube-controller-manager-controlplane       1/1     Running   2               27d
+kube-proxy-82fln                           1/1     Running   0               27d
+kube-proxy-gkxkb                           1/1     Running   0               27d
+kube-scheduler-controlplane                1/1     Running   2               27d
+controlplane $ ls                            
+etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml
+controlplane $ mv kube-scheduler.yaml /
+controlplane $ ls
+etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml
+controlplane $ kubectl get pods -n kube-system
+NAME                                       READY   STATUS    RESTARTS      AGE
+calico-kube-controllers-784cc4bcb7-ghwld   1/1     Running   4 (12m ago)   27d
+canal-6tqbh                                2/2     Running   0             11m
+canal-r5jht                                2/2     Running   0             11m
+coredns-5d769bfcf4-rnp6g                   1/1     Running   0             27d
+coredns-5d769bfcf4-wzbg6                   1/1     Running   0             27d
+etcd-controlplane                          1/1     Running   0             27d
+kube-apiserver-controlplane                1/1     Running   2             27d
+kube-controller-manager-controlplane       1/1     Running   2             27d
+kube-proxy-82fln                           1/1     Running   0             27d
+kube-proxy-gkxkb                           1/1     Running   0             27d
+controlplane $ 
+
+controlplane $ kubectl run app1 --image=nginx
+pod/app1 created
+controlplane $ kubectl get pods -o wide
+NAME   READY   STATUS    RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+app1   0/1     Pending   0          9s    <none>   <none>   <none>           <none>
+controlplane $ 
+
+Using nodeselector named node01 we have deployed the pod.However this is task of sceduler but we have told sceduler to deploy this pod based on our wish to dat node.
+
+controlplane $ cat /andy.yml 
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: sandy-app
+spec:
+ containers:
+ - name: c1
+   image: nginx
+ nodeName: node01 
+controlplane $ cat /s
+sandy.yml  sbin/      snap/      srv/       swapfile   sys/       
+controlplane $ cat /sandy.yml 
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: oracle-app
+spec:
+ containers:
+ - name: c2
+   image: nginx
+ nodeName: node01
+controlplane $ kubectl get pods -o wide
+NAME        READY   STATUS    RESTARTS   AGE     IP            NODE     NOMINATED NODE   READINESS GATES
+app1        0/1     Pending   0          11m     <none>        <none>   <none>           <none>
+sandy-app   1/1     Running   0          6m18s   192.168.1.3   node01   <none>           <none>
+controlplane $ kubectl apply -f /sandy.yml 
+pod/oracle-app created
+controlplane $ kubectl get pods -o wide
+NAME         READY   STATUS    RESTARTS   AGE     IP            NODE     NOMINATED NODE   READINESS GATES
+app1         0/1     Pending   0          11m     <none>        <none>   <none>           <none>
+oracle-app   1/1     Running   0          13s     192.168.1.4   node01   <none>           <none>
+sandy-app    1/1     Running   0          6m47s   192.168.1.3   node01   <none>           <none>
+controlplane $ 
+
+===============nodeselector=======================================
+root@master:~# kubectl get pods -o wide
+NAME                    READY   STATUS        RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+app1-6dffb4d7cb-8pfv8   1/1     Terminating   0          25m   10.38.0.4   worker1   <none>           <none>
+app1-6dffb4d7cb-ktfnk   1/1     Running       0          75s   10.40.0.1   worker2   <none>           <none>
+oracle-app              1/1     Terminating   0          35m   10.38.0.3   worker1   <none>           <none>
+root@master:~# kubectl get nodes
+NAME      STATUS     ROLES           AGE    VERSION
+master    Ready      control-plane   103m   v1.24.0
+worker1   NotReady   <none>          98m    v1.24.0
+worker2   Ready      <none>          95m    v1.24.0
+root@master:~#
+
+root@master:~# cat oracle.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: oracle-app
+spec:
+  containers:
+  - image: nginx
+    name: app1
+  nodeName: worker1
+root@master:~# cat app1.yaml
+apiVersion: apps/v1
+
+
+Deployment  apps aotumatically failover is doing if running node is down (worker1) .but there is 5 to 7 min downtime is there for simple ngnx app as tested in lab.
+
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    run: app1
+  name: app1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: app1
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+      nodeSelector:
+        run: informatica-archive
+
+
+root@master:~# kubectl get nodes --show-labels |grep -i run
+worker1   NotReady   <none>          100m   v1.24.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker1,kubernetes.io/os=linux,run=informatica-archive
+worker2   Ready      <none>          98m    v1.24.0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=worker2,kubernetes.io/os=linux,run=informatica-archive
+
+
+===============================nodeaffinit with required option=============
+
+root@master:/andy# cat nodeaffinity-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.12
+        ports:
+        - containerPort: 80
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+             nodeSelectorTerms:
+              -  matchExpressions:
+                 - key: run
+                   operator: In
+                   values: ["informatica-archive"]
+
+
+There are four affinity rules you can add to podspec:
+
+requiredDuringSchedulingIgnoredDuringExecution
+requiredDuringSchedulingRequiredDuringExecution
+preferredDuringSchedulingIgnoredDuringExecution
+preferredDuringSchedulingRequiredDuringExecution
+
+==========================================Taints===================================================================================================
+root@master:~# kubectl describe nodes | grep -i taints
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+Taints:             <none>
+Taints:             <none>
+root@master:~# kubectl describe nodes | grep -i taints -A 5
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+                    node-role.kubernetes.io/master:NoSchedule
+Unschedulable:      false
+Lease:
+  HolderIdentity:  master
+  AcquireTime:     <unset>
+--
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  worker1
+  AcquireTime:     <unset>
+  RenewTime:       Thu, 03 Aug 2023 11:05:38 +0000
+--
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  worker2
+  AcquireTime:     <unset>
+  RenewTime:       Thu, 03 Aug 2023 11:05:41 +0000
+root@master:~#
+we can see Master node is taint hence not able to create app now we can remove the taint.
+Using below cmd:
+===============
+
+root@master:~# kubectl taint node master node-role.kubernetes.io/master:NoSchedule-
+node/master untainted
+
+Now we can check master node is not tainted using below cmd:
+============================================= 
+
+root@master:~# kubectl describe node | grep -i taint -A 5
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  master
+  AcquireTime:     <unset>
+  RenewTime:       Thu, 03 Aug 2023 11:26:45 +0000
+--
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  worker1
+  AcquireTime:     <unset>
+  RenewTime:       Thu, 03 Aug 2023 11:26:43 +0000
+--
+Taints:             <none>
+Unschedulable:      false
+Lease:
+  HolderIdentity:  worker2
+  AcquireTime:     <unset>
+  RenewTime:       Thu, 03 Aug 2023 11:26:47 +0000
+==============================Taint practicals==============================================================
+we can see even though worker1 node is tainted with startegy no:schedule dat means no pod should be allowd to deploy on that node.
+However we have added tolerations  while cretaing the POD by mentioning the toleration definiton and used the same key value and toleration as per node 1.
+now we can able deploy the tained pod .
+
+root@master:~# vi appandy.yaml
+root@master:~# cat appandy.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sonarcube
+  name: sonarcube-sanu
+spec:
+  containers:
+  - image: nginx
+    name: sonarcube
+  tolerations:
+   - key: "team"
+     operator: "Equal"
+     value: "prod"
+     effect: "NoSchedule"
+
+
+
+root@master:~# kubectl apply -f appandy.yaml
+pod/sonarcube-sanu created
+root@master:~# kubectl get pods -owide
+NAME             READY   STATUS    RESTARTS   AGE     IP          NODE      NOMINATED NODE   READINESS GATES
+sonarcube        1/1     Running   0          2m47s   10.40.0.1   worker2   <none>           <none>
+sonarcube-sanu   1/1     Running   0          10s     10.38.0.1   worker1   <none>           <none>
+root@master:~# kubectl run oracle-appa --image=nginx --dry-run=client -o yaml >testing.yaml
+root@master:~# vi testing.yaml
+root@master:~# kubectl describe node worker1 | grep -i taint
+Taints:             team=prod:NoSchedule
+root@master:~# kubectl get pods -o wide | grep -i worker1
+sonarcube-sanu   1/1     Running   0          3m6s    10.38.0.1   worker1   <none>           <none>
+
+----------
+
+root@master:~# vi appandy.yaml
+root@master:~# cat appandy.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sonarcube
+  name: sonar-Bangla
+spec:
+  containers:
+  - image: nginx
+    name: sonarcube
+  tolerations:
+   - key: "team"
+     operator: "Equal"
+     value: "prod"
+     effect: "NoSchedule"
+   - key: "team"
+     operator: "Equal"
+     value: "prod"
+     effect: "NoExecute"
+   - key: "run"
+     operator: "Equal"
+     value: "patch"
+     effect: "NoSchedule"
+
+root@master:~# kubectl get pods -o wide
+NAME             READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+sonar-sanu       1/1     Running   0          11m   10.38.0.1   worker1   <none>           <none>
+sonarcube-sanu   1/1     Running   0          13m   10.40.0.1   worker2   <none>           <none>
+
+root@master:~# vi appandy.yaml
+root@master:~# kubectl apply -f appandy.yaml
+pod/sonar-bangla created
+root@master:~# kubectl get pods -o wide
+NAME             READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+sonar-bangla     1/1     Running   0          7s    10.32.0.2   master    <none>           <none>
+sonar-sanu       1/1     Running   0          13m   10.38.0.1   worker1   <none>           <none>
+sonarcube-sanu   1/1     Running   0          15m   10.40.0.1   worker2   <none>           <none>
+root@master:~#
+==========================================Toleration with operator exists===============================================================
+Toleration with oprator Exists means we donot need to define "value" field under Tolerations sections.
+We can see we define under toleration section , key (team)   , now this Key named is also having worker node2 as well as worker node1 having same key (Team) but different values.
+worker node1 is having value No Schedule while worker node2 is having Prefer NoSchedule value.
+So basically toleration do macthing of taint fileds among all the nodes  , what taint fileds are there are 3  : Key field, value field , effect field .
+Now using Exists operator , toleration will match 2 filed only to deploy pod , those 2 fileds are in case of operator Exists are 1. Key and 2. effect .
+Now here you can see key named Team is common for both the nodes worker1 and worker2  , however toleration now matching 2nd filed effect whic is different in both the nodes .
+Now effect toleration will check the yaml and will find which node is having same effect as well in dat case he got that worker node1 is mathcing 100% (key (Team) & effect (NoSchedule) as define in 
+POD yaml file .Hence worker node is chosen to deploy the application Pod .
+Moreover u can see worker node effect is NO schedule dat meane it should not allow to deploy POD whereas worker2 is having same KEY (Team) with PreferNoSchedule effect should be choosen .
+But worker node 2did not chose even though PreferNoshcedule effect becuase toleration macthes whatever written in yaml file.
+
+root@master:~# vi tolandy.yaml
+root@master:~# cat tolandy.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sonarcube
+  name: sonar-hyderabad
+spec:
+  containers:
+  - image: nginx
+    name: sonarcube
+  tolerations:
+   - key: "team"    --------------------------------------------------toleration macthed and found this is in worker node 1  .
+     operator: "Exists"
+     effect: "NoSchedule" -------------------------------------------toleration macthed and found this is in worker node 1
+
+root@master:~# kubectl describe node worker1 | grep -i taint
+Taints:             team=prod:NoSchedule
+root@master:~# kubectl describe node worker2 | grep -i taint
+Taints:             team=dev:PreferNoSchedule
+root@master:~# kubectl describe node master | grep -i taint
+Taints:             run=patch:NoSchedule
+
+
+root@master:~# kubectl apply -f tolandy.yaml
+pod/sonar-hyderabad created
+The app deployed in worker node 1 becuase toleration found 2 fileds macthes as per taint definiton on worker node 1.
+root@master:~# kubectl get pods -o wide
+NAME              READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+sonar-hyderabad   1/1     Running   0          7s    10.38.0.1   worker1   <none>           <none>
+root@master:~#
+
+--------
+This is perfect example of toleration , even though no Execute & key Team matches by toleration as per yaml file and he deploys the Pods on worker node .
+As per toleration theory .
+
+root@master:~# vi tolandy.yaml
+root@master:~# cat tolandy.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sonarcube
+  name: sonar-hyderabad
+spec:
+  containers:
+  - image: nginx
+    name: sonarcube
+  tolerations:
+   - key: "team"  --------------------------------toleration maches the as per taint in worker2
+     operator: "Exists"
+     effect: "NoExecute"-------------------------toleration matches the as per taint in worker2
+
+root@master:~# kubectl apply -f tolandy.yaml
+pod/sonar-hyderabad created
+
+Pod is deployed to worker2 , even though taint  effect is Noexecute , but toleration tolerate it and allow the pod to deploy on node.
+root@master:~# kubectl get pods -owide
+NAME              READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+sonar-hyderabad   1/1     Running   0          17s   10.40.0.1   worker2   <none>           <none>
+root@master:~# kubectl describe node worker2 | grep -i taint
+Taints:             team=dev:NoExecute
+
+============================tolerations example with deployment ===============================
+root@master:~# cat app1.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    run: app1
+  name: anand-kanjilal
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: app1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: app1
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+      tolerations:
+      - key: "team"
+        operator: "Exists"
+        effect: "NoSchedule"
+root@master:~#
+
+=========================Daemonset===================================================================================================================
+
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/daemonset-monitor.yml
+
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/monitoring-service.yaml
+
+
+
+
+
+root@master:~# cat daemonset-monitor.yml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+      containers:
+      - name: node-exporter
+        image: prom/node-exporter:latest
+        args:
+          - --path.procfs=/host/proc
+          - --path.sysfs=/host/sys
+        ports:
+        - name: metrics
+          containerPort: 9100
+        volumeMounts:
+        - name: procfs
+          mountPath: /host/proc
+          readOnly: true
+        - name: sysfs
+          mountPath: /host/sys
+          readOnly: true
+      volumes:
+      - name: procfs
+        hostPath:
+          path: /proc
+      - name: sysfs
+        hostPath:
+          path: /sys
+
+
+Daemonset is having self healing property the moent u delete any pod it will create automatically pod again on dat node.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+root@master:~# kubectl get pod -owide
+NAME                           READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+node-exporter-kanjilal-bqmxb   1/1     Running   0          9s    10.38.0.1   worker1   <none>           <none>
+node-exporter-kanjilal-gznq5   1/1     Running   0          9s    10.40.0.1   worker2   <none>           <none>
+node-exporter-kanjilal-k4btm   1/1     Running   0          9s    10.32.0.2   master    <none>           <none>
+root@master:~# kubectl get deployment
+No resources found in default namespace.
+root@master:~# kubectl delete pod node-exporter-kanjilal-k4btm
+pod "node-exporter-kanjilal-k4btm" deleted
+root@master:~# kubectl get pod -owide
+NAME                           READY   STATUS    RESTARTS   AGE    IP          NODE      NOMINATED NODE   READINESS GATES
+node-exporter-kanjilal-582dx   1/1     Running   0          9s     10.32.0.2   master    <none>           <none>
+node-exporter-kanjilal-bqmxb   1/1     Running   0          100s   10.38.0.1   worker1   <none>           <none>
+node-exporter-kanjilal-gznq5   1/1     Running   0          100s   10.40.0.1   worker2   <none>           <none>
+
+The moment u put taint on master node the deamonset pod will evic from dat master node immedately.
+--------------------------------------------------------------------------------------------------------------------------------------
+root@master:~# kubectl taint node master team=patching:NoExecute
+node/master tainted
+root@master:~# kubectl get pods -owide
+NAME                           READY   STATUS    RESTARTS   AGE     IP          NODE      NOMINATED NODE   READINESS GATES
+node-exporter-kanjilal-bqmxb   1/1     Running   0          2m55s   10.38.0.1   worker1   <none>           <none>
+node-exporter-kanjilal-gznq5   1/1     Running   0          2m55s   10.40.0.1   worker2   <none>           <none>
+
+
+The moment u removed the taint from master node it daemonset automatically again started in dat master node.
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+root@master:~# kubectl taint node master  team=patching:NoExecute-
+node/master untainted
+root@master:~# kubectl get pods -o wide
+NAME                           READY   STATUS    RESTARTS   AGE    IP          NODE      NOMINATED NODE   READINESS GATES
+node-exporter-kanjilal-6l7c8   1/1     Running   0          9s     10.32.0.2   master    <none>           <none>
+node-exporter-kanjilal-bqmxb   1/1     Running   0          5m5s   10.38.0.1   worker1   <none>           <none>
+node-exporter-kanjilal-gznq5   1/1     Running   0          5m5s   10.40.0.1   worker2   <none>           <none>
+root@master:~#
+
+--------------------------------------------------------------------
+Finally we can run the service.yaml. downloading from 
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/monitoring-service.yaml
+
+
+root@master:~# cat monitoring-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-service
+spec:
+  ports:
+  - name: portmaping
+    port: 9100
+    protocol: TCP
+    targetPort: 9100
+    nodePort: 30007
+  selector:
+    app: node-exporter
+  type: NodePort
+
+
+
+root@master:~# vi  monitoring-service.yaml
+root@master:~# kubectl apply -f monitoring-service.yaml
+service/monitoring-service created
+root@master:~# kubectl get svc
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes           ClusterIP   10.96.0.1       <none>        443/TCP          39h
+monitoring-service   NodePort    10.108.132.98   <none>        9100:30007/TCP   5s
+root@master:~# curl ifconfig.io
+54.172.131.92
+root@master:~# 54.172.131.92:30007
+
+After apply the service yaml , we can get the svc and access the app node-exporter from google chrome using nodeip:nodeport (54.172.131.92:30007) we will get the promethus monitoring dashboard.
+
+
+root@master:~# kubectl get ds
+NAME                     DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+node-exporter-kanjilal   3         3         3       3            3           <none>          32m
+
+root@master:~# kubectl delete ds node-exporter-kanjilal
+daemonset.apps "node-exporter-kanjilal" deleted
+root@master:~# kubectl get ds
+No resources found in default namespace.
+
+
+
+===========================================================Init containers===========================================================================
+wget https://raw.githubusercontent.com/syedmudasir20/kubernetes-content/main/init-container.yml
+
+root@master:~#  kubectl api-resources --namespaced=true | grep hpa
+horizontalpodautoscalers    hpa          autoscaling/v2                 true         HorizontalPodAutoscaler
+
+
+root@master:~# cat init-container.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-container-demo
+spec:
+  containers:
+  - name: main-app
+    image: nginx
+
+    volumeMounts:
+    - name: workdir
+      mountPath: /usr/share/nginx/html
+
+  initContainers:
+  - name: bootsrap-cont
+    image: busybox
+
+    volumeMounts:
+    - name: workdir
+      mountPath: "/work-dir"
+
+    command: ["/bin/sh"]
+    args: ["-c", "echo '<html><h1>Hello, This Webpage was created by Init Container</h1><html>' >> /work-dir/index.html"]
+
+  volumes:
+  - name: workdir
+    emptyDir: {}
+
+

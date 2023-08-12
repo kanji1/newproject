@@ -1,0 +1,1022 @@
+Maintenance using cordon cmd:
+=======================
+
+root@master:~# kubectl get pods -o wide
+NAME                                 READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+mariadb-deployment-8b77c848d-7hfxn   1/1     Running   0          16s   10.32.0.3   master    <none>           <none>
+mariadb-deployment-8b77c848d-fzdn8   1/1     Running   0          16s   10.32.0.2   master    <none>           <none>
+mariadb-deployment-8b77c848d-qpcvv   1/1     Running   0          66s   10.40.0.1   worker2   <none>           <none>
+mariadb-deployment-8b77c848d-qvbrd   1/1     Running   0          16s   10.40.0.2   worker2   <none>           <none>
+mariadb-deployment-8b77c848d-qwd82   1/1     Running   0          16s   10.38.0.1   worker1   <none>           <none>
+root@master:~# kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+master    Ready    control-plane   9d    v1.24.0
+worker1   Ready    <none>          9d    v1.24.0
+worker2   Ready    <none>          9d    v1.24.0
+root@master:~# kubectl cordon master
+node/master cordoned
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0    ----------------> after cordon we can schdule anything on dat node
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready                      <none>          9d    v1.24.0
+
+We have found no issue with alredy running nodes on master node even though we have setup cordon.
+---------------------------------------------------------------------------------
+root@master:~# kubectl get pods -o wide
+NAME                                 READY   STATUS    RESTARTS   AGE     IP          NODE      NOMINATED NODE   READINESS GATES
+mariadb-deployment-8b77c848d-7hfxn   1/1     Running   0          3m11s   10.32.0.3   master    <none>           <none>
+mariadb-deployment-8b77c848d-fzdn8   1/1     Running   0          3m11s   10.32.0.2   master    <none>           <none>
+mariadb-deployment-8b77c848d-qpcvv   1/1     Running   0          4m1s    10.40.0.1   worker2   <none>           <none>
+mariadb-deployment-8b77c848d-qvbrd   1/1     Running   0          3m11s   10.40.0.2   worker2   <none>           <none>
+mariadb-deployment-8b77c848d-qwd82   0/1     Error     0          3m11s   10.38.0.1   worker1   <none>           <none>
+mariadb-deployment-8b77c848d-vcz8q   1/1     Running   0          2m35s   10.40.0.3   worker2   <none>           <none>
+root@master:~#
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready                      <none>          9d    v1.24.0
+
+
+How to remove cordon:
+---------------------------
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready                      <none>          9d    v1.24.0
+
+root@master:~# kubectl uncordon master
+node/master uncordoned
+
+root@master:~# kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+master    Ready    control-plane   9d    v1.24.0
+worker1   Ready    <none>          9d    v1.24.0
+worker2   Ready    <none>          9d    v1.24.0
+
+cordon and uncordon there is no effect on alredy running nodes on that node (master) however we cant schedule any new deployment on that node.
+
+======================================Drain concept=============================================================================================
+Drain concept is we can drain any node  , the running POds will be moved to other ready node on same cluster.
+Here we are going to drain worker1 where 3 pods are running as deployment . 
+
+
+root@master:~# kubectl get pods -o wide
+NAME                              READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+anand-kanjilal-6f9b8f7f46-2nd78   1/1     Running   0          95s   10.38.0.2   worker1   <none>           <none>
+anand-kanjilal-6f9b8f7f46-nxnbd   1/1     Running   0          95s   10.38.0.3   worker1   <none>           <none>
+anand-kanjilal-6f9b8f7f46-x2r25   1/1     Running   0          94s   10.38.0.5   worker1   <none>           <none>
+
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+root@master:~# kubectl uncordon worker2
+node/worker2 uncordoned
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready                      <none>          9d    v1.24.0
+
+When we ran drain on worker1 it would be marked as "Ready,SchedulingDisabled" and all the running pods from worker1 will move to next ready node worker2
+automatically. Please note drain doesnot work for daemon sets hence need to give --ignore-daemonsets option.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+root@master:~# kubectl drain worker1 --ignore-daemonsets
+node/worker1 cordoned
+WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-proxy-m4hk4, kube-system/weave-net-pd7wt
+evicting pod kube-system/coredns-6d4b75cb6d-wm2dt
+evicting pod default/anand-kanjilal-6f9b8f7f46-nxnbd
+evicting pod default/anand-kanjilal-6f9b8f7f46-2nd78
+evicting pod default/anand-kanjilal-6f9b8f7f46-x2r25
+evicting pod kube-system/coredns-6d4b75cb6d-fgczz
+pod/anand-kanjilal-6f9b8f7f46-2nd78 evicted
+pod/anand-kanjilal-6f9b8f7f46-x2r25 evicted
+pod/anand-kanjilal-6f9b8f7f46-nxnbd evicted
+pod/coredns-6d4b75cb6d-wm2dt evicted
+pod/coredns-6d4b75cb6d-fgczz evicted
+node/worker1 drained
+
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+worker2   Ready                      <none>          9d    v1.24.0
+root@master:~# kubectl get pods -o wide
+NAME                              READY   STATUS    RESTARTS   AGE   IP          NODE      NOMINATED NODE   READINESS GATES
+anand-kanjilal-6f9b8f7f46-hwlhd   1/1     Running   0          82s   10.40.0.5   worker2   <none>           <none>
+anand-kanjilal-6f9b8f7f46-rcbcg   1/1     Running   0          82s   10.40.0.1   worker2   <none>           <none>
+anand-kanjilal-6f9b8f7f46-rjlqc   1/1     Running   0          82s   10.40.0.4   worker2   <none>           <none>
+root@master:~#
+
+===================================upgrade k8========================================================================================================
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+root@master:~# lsb_release -a
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 20.04.6 LTS
+Release:        20.04
+Codename:       focal
+root@master:~# apt update
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease [114 kB]
+Get:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease [108 kB]
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Get:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8993 B]
+Get:6 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]
+Get:7 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main amd64 Packages [2735 kB]
+Get:8 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages [2351 kB]
+Get:9 http://security.ubuntu.com/ubuntu focal-security/main Translation-en [371 kB]
+Get:10 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [2053 kB]
+Get:11 http://security.ubuntu.com/ubuntu focal-security/restricted Translation-en [287 kB]
+Get:12 http://security.ubuntu.com/ubuntu focal-security/universe amd64 Packages [870 kB]
+Get:13 http://security.ubuntu.com/ubuntu focal-security/universe Translation-en [182 kB]
+Fetched 9195 kB in 3s (3556 kB/s)
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+47 packages can be upgraded. Run 'apt list --upgradable' to see them.
+root@master:~# apt-cache madison kubeadm
+   kubeadm |  1.27.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.27.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.27.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.27.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.27.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.26.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.25.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.25.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.25.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.25.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.24.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.24.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.17-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.23.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.23.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.17-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.22.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.22.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.21.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.21.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.21.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.21.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.21.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.21.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.20.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.20.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.20.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.20.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.20.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.20.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.20.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.19.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.19.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.20-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.19-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.18-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.17-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.18.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.4-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.18.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.17-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.17.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.7-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.17.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.11-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.16.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.16.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.15.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.15.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.15.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.15.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.14.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.14.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.13.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.13.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.13.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.13.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.12.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.12.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.11.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.11.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.10.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.10.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.10.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm | 1.10.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.10.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.9.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.9.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.9.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.8.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.8.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.8.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.8.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.8.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.8.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.1-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.0-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.8.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.7.16-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.7.15-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.7.14-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.7.11-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.7.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.3-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.7.0-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.6.13-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.6.12-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.6.11-01 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |  1.6.10-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.9-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.8-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.6-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.5-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.4-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.3-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.2-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.6.1-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+   kubeadm |   1.5.7-00 | http://apt.kubernetes.io kubernetes-xenial/main amd64 Packages
+root@master:~# apt-mark unhold kubeadm
+kubeadm was already not hold.
+root@master:~# apt-get update && apt-get install -y kubeadm=1.24.16-00
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Hit:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease
+Hit:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Hit:6 http://security.ubuntu.com/ubuntu focal-security InRelease
+Hit:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be upgraded:
+  kubeadm
+1 upgraded, 0 newly installed, 0 to remove and 46 not upgraded.
+Need to get 9199 kB of archives.
+After this operation, 1184 kB of additional disk space will be used.
+Get:1 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubeadm amd64 1.24.16-00 [9199 kB]
+Fetched 9199 kB in 0s (26.6 MB/s)
+(Reading database ... 90829 files and directories currently installed.)
+Preparing to unpack .../kubeadm_1.24.16-00_amd64.deb ...
+Unpacking kubeadm (1.24.16-00) over (1.24.0-00) ...
+Setting up kubeadm (1.24.16-00) ...
+root@master:~# apt-mark hold kubeadm
+kubeadm set on hold.
+root@master:~# kubeadm version
+kubeadm version: &version.Info{Major:"1", Minor:"24", GitVersion:"v1.24.16", GitCommit:"51e33fadff13065ae5518db94e84598293965939", GitTreeState:"clean", BuildDate:"2023-07-19T12:24:58Z", GoVersion:"go1.20.6", Compiler:"gc", Platform:"linux/amd64"}
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+root@master:~# kubeadm upgrade plan
+[upgrade/config] Making sure the configuration is correct:
+[upgrade/config] Reading configuration from the cluster...
+[upgrade/config] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[preflight] Running pre-flight checks.
+[upgrade] Running cluster health checks
+[upgrade] Fetching available versions to upgrade to
+[upgrade/versions] Cluster version: v1.24.0
+[upgrade/versions] kubeadm version: v1.24.16
+I0811 11:32:53.662368  326516 version.go:256] remote version is much newer: v1.27.4; falling back to: stable-1.24
+[upgrade/versions] Target version: v1.24.16
+[upgrade/versions] Latest version in the v1.24 series: v1.24.16
+
+Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
+COMPONENT   CURRENT       TARGET
+kubelet     3 x v1.24.0   v1.24.16
+
+Upgrade to the latest version in the v1.24 series:
+
+COMPONENT                 CURRENT   TARGET
+kube-apiserver            v1.24.0   v1.24.16
+kube-controller-manager   v1.24.0   v1.24.16
+kube-scheduler            v1.24.0   v1.24.16
+kube-proxy                v1.24.0   v1.24.16
+CoreDNS                   v1.8.6    v1.8.6
+etcd                      3.5.3-0   3.5.6-0
+
+You can now apply the upgrade by executing the following command:
+
+
+
+
+
+
+
+
+
+
+        kubeadm upgrade apply v1.24.16
+
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
+_____________________________________________________________________
+
+root@master:~# kubeadm upgrade apply v1.24.16
+[upgrade/config] Making sure the configuration is correct:
+[upgrade/config] Reading configuration from the cluster...
+[upgrade/config] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[preflight] Running pre-flight checks.
+[upgrade] Running cluster health checks
+[upgrade/version] You have chosen to change the cluster version to "v1.24.16"
+[upgrade/versions] Cluster version: v1.24.0
+[upgrade/versions] kubeadm version: v1.24.16
+[upgrade/confirm] Are you sure you want to proceed with the upgrade? [y/N]: y
+[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster
+[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection
+[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'
+[upgrade/apply] Upgrading your Static Pod-hosted control plane to version "v1.24.16" (timeout: 5m0s)...
+[upgrade/etcd] Upgrading to TLS for etcd
+[upgrade/staticpods] Preparing for "etcd" upgrade
+[upgrade/staticpods] Renewing etcd-server certificate
+[upgrade/staticpods] Renewing etcd-peer certificate
+[upgrade/staticpods] Renewing etcd-healthcheck-client certificate
+[upgrade/staticpods] Moved new manifest to "/etc/kubernetes/manifests/etcd.yaml" and backed up old manifest to "/etc/kubernetes/tmp/kubeadm-backup-manifests-2023-08-11-11-36-53/etcd.yaml"
+[upgrade/staticpods] Waiting for the kubelet to restart the component
+[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout 5m0s)
+[apiclient] Found 1 Pods for label selector component=etcd
+
+[upgrade/staticpods] Component "etcd" upgraded successfully!
+[upgrade/etcd] Waiting for etcd to become available
+[upgrade/staticpods] Writing new Static Pod manifests to "/etc/kubernetes/tmp/kubeadm-upgraded-manifests3625644277"
+[upgrade/staticpods] Preparing for "kube-apiserver" upgrade
+[upgrade/staticpods] Renewing apiserver certificate
+[upgrade/staticpods] Renewing apiserver-kubelet-client certificate
+[upgrade/staticpods] Renewing front-proxy-client certificate
+[upgrade/staticpods] Renewing apiserver-etcd-client certificate
+[upgrade/staticpods] Moved new manifest to "/etc/kubernetes/manifests/kube-apiserver.yaml" and backed up old manifest to "/etc/kubernetes/tmp/kubeadm-backup-manifests-2023-08-11-11-36-53/kube-apiserver.yaml"
+[upgrade/staticpods] Waiting for the kubelet to restart the component
+[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout 5m0s)
+[apiclient] Found 1 Pods for label selector component=kube-apiserver
+[upgrade/staticpods] Component "kube-apiserver" upgraded successfully!
+[upgrade/staticpods] Preparing for "kube-controller-manager" upgrade
+[upgrade/staticpods] Renewing controller-manager.conf certificate
+[upgrade/staticpods] Moved new manifest to "/etc/kubernetes/manifests/kube-controller-manager.yaml" and backed up old manifest to "/etc/kubernetes/tmp/kubeadm-backup-manifests-2023-08-11-11-36-53/kube-controller-manager.yaml"
+[upgrade/staticpods] Waiting for the kubelet to restart the component
+[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout 5m0s)
+[apiclient] Found 1 Pods for label selector component=kube-controller-manager
+[upgrade/staticpods] Component "kube-controller-manager" upgraded successfully!
+[upgrade/staticpods] Preparing for "kube-scheduler" upgrade
+[upgrade/staticpods] Renewing scheduler.conf certificate
+[upgrade/staticpods] Moved new manifest to "/etc/kubernetes/manifests/kube-scheduler.yaml" and backed up old manifest to "/etc/kubernetes/tmp/kubeadm-backup-manifests-2023-08-11-11-36-53/kube-scheduler.yaml"
+[upgrade/staticpods] Waiting for the kubelet to restart the component
+[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout 5m0s)
+[apiclient] Found 1 Pods for label selector component=kube-scheduler
+[upgrade/staticpods] Component "kube-scheduler" upgraded successfully!
+[upgrade/postupgrade] Removing the deprecated label node-role.kubernetes.io/master='' from all control plane Nodes. After this step only the label node-role.kubernetes.io/control-plane='' will be present on control plane Nodes.
+[upgrade/postupgrade] Adding the new taint &Taint{Key:node-role.kubernetes.io/control-plane,Value:,Effect:NoSchedule,TimeAdded:<nil>,} to all control plane Nodes. After this step both taints &Taint{Key:node-role.kubernetes.io/control-plane,Value:,Effect:NoSchedule,TimeAdded:<nil>,} and &Taint{Key:node-role.kubernetes.io/master,Value:,Effect:NoSchedule,TimeAdded:<nil>,} should be present on control plane Nodes.
+[upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[kubelet] Creating a ConfigMap "kubelet-config" in namespace kube-system with the configuration for the kubelets in the cluster
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to get nodes
+[bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+[bootstrap-token] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+[bootstrap-token] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+[addons] Applied essential addon: CoreDNS
+[addons] Applied essential addon: kube-proxy
+
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.24.16". Enjoy!
+
+[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.
+root@master:~#
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.0
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+
+
+root@master:~# kubectl drain master --ignore-daemonsets
+node/master cordoned
+WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-proxy-zl499, kube-system/weave-net-4ng6v
+node/master drained
+
+
+root@master:~# apt-mark unhold kubelet kubectl
+kubelet was already not hold.
+kubectl was already not hold.
+
+
+root@master:~# apt-get update && apt-get install -y kubelet=1.24.16-00 kubectl=1.24.16-00
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Hit:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease
+Hit:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Hit:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease
+Get:6 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]
+Get:7 http://security.ubuntu.com/ubuntu focal-security/main amd64 c-n-f Metadata [13.0 kB]
+Get:8 http://security.ubuntu.com/ubuntu focal-security/universe amd64 c-n-f Metadata [18.9 kB]
+Fetched 146 kB in 1s (143 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be upgraded:
+  kubectl kubelet
+2 upgraded, 0 newly installed, 0 to remove and 45 not upgraded.
+Need to get 29.2 MB of archives.
+After this operation, 2699 kB of additional disk space will be used.
+Get:1 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubectl amd64 1.24.16-00 [9538 kB]
+Get:2 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubelet amd64 1.24.16-00 [19.7 MB]
+Fetched 29.2 MB in 2s (15.8 MB/s)
+(Reading database ... 90829 files and directories currently installed.)
+Preparing to unpack .../kubectl_1.24.16-00_amd64.deb ...
+Unpacking kubectl (1.24.16-00) over (1.24.0-00) ...
+Preparing to unpack .../kubelet_1.24.16-00_amd64.deb ...
+Unpacking kubelet (1.24.16-00) over (1.24.0-00) ...
+Setting up kubectl (1.24.16-00) ...
+Setting up kubelet (1.24.16-00) ...
+
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready,SchedulingDisabled   control-plane   9d    v1.24.16
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+
+root@master:~# systemctl daemon-reload
+root@master:~# systemctl restart kubelet
+root@master:~# kubectl uncordon master
+node/master uncordoned
+
+root@master:~# kubectl  get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready                      control-plane   9d    v1.24.16
+worker1   Ready                      <none>          9d    v1.24.0
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+
+=======================Now upgarding worker1 node=============================================================================================
+root@worker1:~# apt-mark unhold kubeadm
+kubeadm was already not hold.
+root@worker1:~# apt-get update && apt-get install -y kubeadm=1.24.16-00
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease [114 kB]
+Get:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease [108 kB]
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Get:6 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]
+Get:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8993 B]
+Get:7 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages [2351 kB]
+Get:8 http://security.ubuntu.com/ubuntu focal-security/main Translation-en [371 kB]
+Get:9 http://security.ubuntu.com/ubuntu focal-security/main amd64 c-n-f Metadata [13.0 kB]
+Get:10 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [2053 kB]
+Get:11 http://security.ubuntu.com/ubuntu focal-security/restricted Translation-en [287 kB]
+Get:12 http://security.ubuntu.com/ubuntu focal-security/universe amd64 Packages [870 kB]
+Get:13 http://security.ubuntu.com/ubuntu focal-security/universe Translation-en [182 kB]
+Get:14 http://security.ubuntu.com/ubuntu focal-security/universe amd64 c-n-f Metadata [18.9 kB]
+Fetched 6491 kB in 3s (2353 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be upgraded:
+  kubeadm
+1 upgraded, 0 newly installed, 0 to remove and 46 not upgraded.
+Need to get 9199 kB of archives.
+After this operation, 1184 kB of additional disk space will be used.
+Get:1 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubeadm amd64 1.24.16-00 [9199 kB]
+Fetched 9199 kB in 0s (33.7 MB/s)
+(Reading database ... 90829 files and directories currently installed.)
+Preparing to unpack .../kubeadm_1.24.16-00_amd64.deb ...
+Unpacking kubeadm (1.24.16-00) over (1.24.0-00) ...
+Setting up kubeadm (1.24.16-00) ...
+root@worker1:~# apt-mark hold kubeadm
+kubeadm set on hold.
+
+root@worker1:~# kubeadm upgrade node
+[upgrade] Reading configuration from the cluster...
+[upgrade] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[preflight] Running pre-flight checks
+[preflight] Skipping prepull. Not a control plane node.
+[upgrade] Skipping phase. Not a control plane node.
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[upgrade] The configuration for this node was successfully updated!
+[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.
+
+
+root@master:~# kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+master    Ready    control-plane   9d    v1.24.16
+worker1   Ready    <none>          9d    v1.24.0
+worker2   Ready    <none>          9d    v1.24.0
+==========
+root@master:~# kubectl drain worker1 --ignore-daemonsets
+node/worker1 cordoned
+WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-proxy-mh5rt, kube-system/weave-net-pd7wt
+evicting pod kube-system/coredns-57575c5f89-l9qkd
+evicting pod default/anand-kanjilal-6f9b8f7f46-6kcdf
+evicting pod default/anand-kanjilal-6f9b8f7f46-nd57v
+evicting pod default/anand-kanjilal-6f9b8f7f46-jdwlf
+evicting pod kube-system/coredns-57575c5f89-8zd82
+pod/anand-kanjilal-6f9b8f7f46-nd57v evicted
+pod/anand-kanjilal-6f9b8f7f46-jdwlf evicted
+pod/anand-kanjilal-6f9b8f7f46-6kcdf evicted
+pod/coredns-57575c5f89-l9qkd evicted
+pod/coredns-57575c5f89-8zd82 evicted
+node/worker1 drained
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready                      control-plane   9d    v1.24.16
+worker1   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+worker2   Ready                      <none>          9d    v1.24.0
+root@master:~#
+
+root@worker1:~# apt-mark unhold kubelet kubectl
+kubelet was already not hold.
+kubectl was already not hold.
+
+root@worker1:~# apt-get update && apt-get install -y kubelet=1.24.16-00 kubectl=1.24.16-00
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Hit:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease
+Hit:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Hit:6 http://security.ubuntu.com/ubuntu focal-security InRelease
+Get:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8993 B]
+Fetched 8993 B in 1s (9223 B/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be upgraded:
+  kubectl kubelet
+2 upgraded, 0 newly installed, 0 to remove and 45 not upgraded.
+Need to get 29.2 MB of archives.
+After this operation, 2699 kB of additional disk space will be used.
+Get:1 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubectl amd64 1.24.16-00 [9538 kB]
+Get:2 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubelet amd64 1.24.16-00 [19.7 MB]
+Fetched 29.2 MB in 1s (35.4 MB/s)
+(Reading database ... 90829 files and directories currently installed.)
+Preparing to unpack .../kubectl_1.24.16-00_amd64.deb ...
+Unpacking kubectl (1.24.16-00) over (1.24.0-00) ...
+Preparing to unpack .../kubelet_1.24.16-00_amd64.deb ...
+Unpacking kubelet (1.24.16-00) over (1.24.0-00) ...
+Setting up kubectl (1.24.16-00) ...
+Setting up kubelet (1.24.16-00) ...
+
+root@worker1:~# apt-mark hold kubelet kubectl
+kubelet set on hold.
+kubectl set on hold.
+
+root@worker1:~# systemctl daemon-reload
+root@worker1:~# systemctl restart kubelet
+
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready                      control-plane   9d    v1.24.16
+worker1   Ready,SchedulingDisabled   <none>          9d    v1.24.16
+worker2   Ready                      <none>          9d    v1.24.0
+root@master:~# kubectl uncordon worker1
+node/worker1 uncordoned
+root@master:~# kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+master    Ready    control-plane   9d    v1.24.16
+worker1   Ready    <none>          9d    v1.24.16
+worker2   Ready    <none>          9d    v1.24.0
+
+
+
+
+
+
+
+======================================================Now worker2 upgarde==========================================================================
+
+root@worker2:~# lsb_release -a
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 20.04.6 LTS
+Release:        20.04
+Codename:       focal
+root@worker2:~#
+
+Step 1.root@worker2:~# apt-mark unhold kubeadm
+  kubeadm was already not hold.
+
+
+
+   Step 2. root@worker2:~# apt-get update && apt-get install -y kubeadm=1.24.16-00
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease [114 kB]
+Get:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease [108 kB]
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Get:6 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]
+Hit:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease
+Get:7 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main amd64 Packages [2735 kB]
+Get:8 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates/main amd64 c-n-f Metadata [17.0 kB]
+Get:9 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages [2351 kB]
+Get:10 http://security.ubuntu.com/ubuntu focal-security/main Translation-en [371 kB]
+Get:11 http://security.ubuntu.com/ubuntu focal-security/main amd64 c-n-f Metadata [13.0 kB]
+Get:12 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [2053 kB]
+Get:13 http://security.ubuntu.com/ubuntu focal-security/restricted Translation-en [287 kB]
+Get:14 http://security.ubuntu.com/ubuntu focal-security/universe amd64 Packages [870 kB]
+Get:15 http://security.ubuntu.com/ubuntu focal-security/universe Translation-en [182 kB]
+Get:16 http://security.ubuntu.com/ubuntu focal-security/universe amd64 c-n-f Metadata [18.9 kB]
+Fetched 9234 kB in 3s (2707 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be upgraded:
+  kubeadm
+1 upgraded, 0 newly installed, 0 to remove and 46 not upgraded.
+Need to get 9199 kB of archives.
+After this operation, 1184 kB of additional disk space will be used.
+Get:1 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubeadm amd64 1.24.16-00 [9199 kB]
+Fetched 9199 kB in 1s (12.1 MB/s)
+(Reading database ... 90829 files and directories currently installed.)
+Preparing to unpack .../kubeadm_1.24.16-00_amd64.deb ...
+Unpacking kubeadm (1.24.16-00) over (1.24.0-00) ...
+Setting up kubeadm (1.24.16-00) ...
+ Step 3 .root@worker2:~# apt-mark hold kubeadm
+      kubeadm set on hold.
+
+Step 4. root@worker2:~# kubeadm upgrade node
+[upgrade] Reading configuration from the cluster...
+[upgrade] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[preflight] Running pre-flight checks
+[preflight] Skipping prepull. Not a control plane node.
+[upgrade] Skipping phase. Not a control plane node.
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[upgrade] The configuration for this node was successfully updated!
+[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.
+
+
+Step5 .  
+root@master:~# kubectl drain worker2 --ignore-daemonsets
+node/worker2 cordoned
+WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-proxy-cplsk, kube-system/weave-net-tlrtv
+evicting pod kube-system/coredns-57575c5f89-h7snt
+evicting pod default/anand-kanjilal-6f9b8f7f46-6s5dr
+evicting pod default/anand-kanjilal-6f9b8f7f46-zqs7k
+pod/anand-kanjilal-6f9b8f7f46-zqs7k evicted
+pod/anand-kanjilal-6f9b8f7f46-6s5dr evicted
+pod/coredns-57575c5f89-h7snt evicted
+node/worker2 drained
+root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready                      control-plane   9d    v1.24.16
+worker1   Ready                      <none>          9d    v1.24.16
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.0
+root@master:~#
+
+Step6 . root@worker2:~# apt-mark unhold kubelet kubectl
+kubelet was already not hold.
+kubectl was already not hold.
+
+root@worker2:~# apt-get update && apt-get install -y kubelet=1.24.16-00 kubectl=1.24.16-00
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal InRelease
+Hit:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-updates InRelease
+Hit:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu focal-backports InRelease
+Hit:4 https://download.docker.com/linux/ubuntu focal InRelease
+Hit:6 http://security.ubuntu.com/ubuntu focal-security InRelease
+Get:5 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8993 B]
+Fetched 8993 B in 1s (7973 B/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be upgraded:
+  kubectl kubelet
+2 upgraded, 0 newly installed, 0 to remove and 45 not upgraded.
+Need to get 29.2 MB of archives.
+After this operation, 2699 kB of additional disk space will be used.
+Get:1 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubectl amd64 1.24.16-00 [9538 kB]
+Get:2 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubelet amd64 1.24.16-00 [19.7 MB]
+Fetched 29.2 MB in 1s (41.5 MB/s)
+(Reading database ... 90829 files and directories currently installed.)
+Preparing to unpack .../kubectl_1.24.16-00_amd64.deb ...
+Unpacking kubectl (1.24.16-00) over (1.24.0-00) ...
+Preparing to unpack .../kubelet_1.24.16-00_amd64.deb ...
+Unpacking kubelet (1.24.16-00) over (1.24.0-00) ...
+Setting up kubectl (1.24.16-00) ...
+Setting up kubelet (1.24.16-00) ...
+
+root@worker2:~# apt-mark hold kubelet kubectl
+kubelet set on hold.
+kubectl set on hold.
+
+Step7. root@worker2:~# systemctl daemon-reload
+root@worker2:~# systemctl restart kubelet
+
+Step8. root@master:~# kubectl get nodes
+NAME      STATUS                     ROLES           AGE   VERSION
+master    Ready                      control-plane   9d    v1.24.16
+worker1   Ready                      <none>          9d    v1.24.16
+worker2   Ready,SchedulingDisabled   <none>          9d    v1.24.16
+
+root@master:~# kubectl uncordon worker2
+node/worker2 uncordoned
+
+root@master:~# kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+master    Ready    control-plane   9d    v1.24.16
+worker1   Ready    <none>          9d    v1.24.16
+worker2   Ready    <none>          9d    v1.24.16
+
+All mastr nodes and worker nodes upgarded to V124.16 from V1.24.0 succesfully
+
+
+=====================================STS (steful set YAML)=============================================================================================
+
+root@master:~/Kubernetes# cat sts.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sts-service
+spec:
+  selector:
+    app: my-app
+  ports:
+    - name: k21-port
+      protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+    - name: mysql-port
+      protocol: TCP
+      port: 3306
+      targetPort: 3306
+      nodePort: 30306
+  type: NodePort
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web-statefulset
+spec:
+  serviceName: sts-service
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-container
+          image: 11905510/k21academy:1.0
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-volume
+              mountPath: /var/www/html
+        - name: mysql-container
+          image: mysql:latest
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: mypassword
+          volumeMounts:
+            - name: mysql-volume
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: nginx-volume
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName:  managed-nfs-storage
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: mysql-volume
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName:  managed-nfs-storage
+        resources:
+          requests:
+            storage: 2Gi
